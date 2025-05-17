@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Собираем приложение
-RUN go build -o main .
+RUN go build -o main ./cmd/app
 
 # Открываем порт, на котором работает приложение
 EXPOSE 8080

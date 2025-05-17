@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	ctx := context.Background()
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
