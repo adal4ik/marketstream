@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Собираем приложение
-RUN go build -o main ./cmd/marketflow  
+RUN go build -o main ./cmd/marketstream
 
 # Открываем порт
 EXPOSE 8080
