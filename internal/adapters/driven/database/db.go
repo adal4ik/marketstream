@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	host        = os.Getenv("DB_HOST")
-	user        = os.Getenv("DB_USER")
-	password    = os.Getenv("DB_PASSWORD")
-	name        = os.Getenv("DB_NAME")
-	port, exist = os.LookupEnv("DB_PORT")
+	host     = os.Getenv("DB_HOST")
+	user     = os.Getenv("DB_USER")
+	password = os.Getenv("DB_PASSWORD")
+	name     = os.Getenv("DB_NAME")
+	port     = os.Getenv("DB_PORT")
 )
 
 func ConnectDB() *sql.DB {
