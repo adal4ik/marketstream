@@ -30,6 +30,22 @@ services:
     networks:
       - marketnet
 
+  exchange2:
+    image: exchange2
+    container_name: exchange2
+    ports:
+      - "40102:40102"
+    networks:
+      - marketnet
+
+  exchange3:  
+    image: exchange3
+    container_name: exchange3
+    ports:
+      - "40103:40103"
+    networks:
+      - marketnet
+
   app:
     build: .
     container_name: app
@@ -43,7 +59,11 @@ services:
       - DB_NAME=${DB_NAME}
     depends_on:
       - db
+      - redis
       - exchange1
+      - exchange2
+      - exchange3
+
     networks:
       - marketnet
 

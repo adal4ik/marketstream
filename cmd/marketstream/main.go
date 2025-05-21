@@ -32,7 +32,11 @@ func main() {
 	defer rdb.Close()
 	logger, logFile := utils.Logger()
 	defer logFile.Close()
+
 	go exchange.ListenExchange("exchange1:40101")
+	go exchange.ListenExchange("exchange2:40102")
+	go exchange.ListenExchange("exchange3:40103")
+
 	baseHandler := handlers.NewBaseHandler(*logger)
 	repositories := repository.New(db)
 	services := service.New()
