@@ -4,25 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	_ "github.com/lib/pq"
+
+	"marketstream/internal/config"
 )
 
-var (
-	host     = os.Getenv("DB_HOST")
-	user     = os.Getenv("DB_USER")
-	password = os.Getenv("DB_PASSWORD")
-	name     = os.Getenv("DB_NAME")
-	port     = os.Getenv("DB_PORT")
-)
-
-func ConnectDB() *sql.DB {
+func ConnectDB(cfg config.DatabaseConfig) *sql.DB {
 	time.Sleep(5 * time.Second)
 	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
 		"password=%s dbname=%s sslmode=disable",
-		host, port, user, password, name)
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name)
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {

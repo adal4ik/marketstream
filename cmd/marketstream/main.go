@@ -18,19 +18,21 @@ import (
 	"marketstream/internal/adapters/driver/cli"
 	"marketstream/internal/adapters/driver/web"
 	"marketstream/internal/adapters/driver/web/handlers"
+	"marketstream/internal/config"
 	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
 )
 
 func main() {
 	ctx := context.Background()
-	db := database.ConnectDB()
+	cfg := config.Load()
+	db := database.ConnectDB(cfg.Database)
 	defer db.Close()
-	rdb := redis.NewRedis(ctx)
+	rdb := redis.NewRedis(ctx, cfg.Redis)
 	defer rdb.Close()
 	logger, logFile := utils.Logger()
 	defer logFile.Close()
-	exchange.ListenExchange("127.0.0.1:40101")
+	go exchange.ListenExchange("exchange1:40101")
 	baseHandler := handlers.NewBaseHandler(*logger)
 	repositories := repository.New(db)
 	services := service.New()
