@@ -39,10 +39,8 @@ func main() {
 
 	baseHandler := handlers.NewBaseHandler(*logger)
 	repositories := repository.New(db)
-	services := service.New()
-	_ = services
-	_ = repositories
-	handlers := handlers.New(*baseHandler)
+	services := service.New(*repositories, rdb)
+	handlers := handlers.New(*baseHandler, *services)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 	mux := web.NewRouter(*handlers)

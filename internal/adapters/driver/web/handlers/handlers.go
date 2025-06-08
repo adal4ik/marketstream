@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
 )
 
@@ -38,10 +39,10 @@ type Handlers struct {
 	PriceHandler *PriceHandler
 }
 
-func New(baseHandler BaseHandler) *Handlers {
+func New(baseHandler BaseHandler, service service.Service) *Handlers {
 	return &Handlers{
 		HealthCheck:  NewHealthCheckHandler(baseHandler),
 		ModeHandler:  NewModeHandler(baseHandler),
-		PriceHandler: NewPriceHandler(baseHandler),
+		PriceHandler: NewPriceHandler(baseHandler, service.PriceService),
 	}
 }
