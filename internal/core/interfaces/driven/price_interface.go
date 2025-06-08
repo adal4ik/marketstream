@@ -1,3 +1,3 @@
 package driveninterfaces
 
-type PriceDrivenInterface interface{}
+type DataBaseInterface interface{}

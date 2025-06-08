@@ -1,9 +1,1 @@
-Tasks for todays work:
-
-1.
-2.
-3.
-4.
-5.
-6.
-7.
+1. Workers should be replaced into service and process data there through repositories of Redis and Psql

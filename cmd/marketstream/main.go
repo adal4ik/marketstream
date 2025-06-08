@@ -28,20 +28,19 @@ func main() {
 	db := database.ConnectDB(cfg.Database)
 	defer db.Close()
 	rdb := redis.NewRedis(ctx, cfg.Redis)
-	defer rdb.Close()
 	logger, logFile := utils.Logger()
 	defer logFile.Close()
-
-	FanInChannel := make(chan exchange.ExchangeData, 100)
-	go exchange.Aggregator(FanInChannel, ctx)
-	// Distributors
-	go exchange.ListenExchange("exchange1:40101", ctx, rdb)
-	go exchange.ListenExchange("exchange2:40102", ctx, rdb)
-	go exchange.ListenExchange("exchange3:40103", ctx, rdb)
+	// // Distributors
 
 	baseHandler := handlers.NewBaseHandler(*logger)
 	repositories := repository.New(db)
 	services := service.New(*repositories, rdb)
+	ExchangeHandler := exchange.NewExchageHandler(services.ExchangeService)
+	// Starting Listeners
+	go ExchangeHandler.ListenExchange("exchange1:40101", ctx)
+	go ExchangeHandler.ListenExchange("exchange2:40102", ctx)
+	go ExchangeHandler.ListenExchange("exchange3:40103", ctx)
+
 	handlers := handlers.New(*baseHandler, *services)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
