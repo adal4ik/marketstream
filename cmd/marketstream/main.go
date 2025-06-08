@@ -3,6 +3,16 @@ package main
 import (
 	"context"
 	"log"
+	"marketstream/internal/adapters/driven/database"
+	"marketstream/internal/adapters/driven/database/repository"
+	"marketstream/internal/adapters/driven/redis"
+	"marketstream/internal/adapters/driver/cli"
+	"marketstream/internal/adapters/driver/exchange"
+	"marketstream/internal/adapters/driver/web"
+	"marketstream/internal/adapters/driver/web/handlers"
+	"marketstream/internal/config"
+	"marketstream/internal/core/service"
+	"marketstream/internal/utils"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,17 +20,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-
-	"marketstream/internal/adapters/driven/database"
-	"marketstream/internal/adapters/driven/database/repository"
-	"marketstream/internal/adapters/driven/exchange"
-	"marketstream/internal/adapters/driven/redis"
-	"marketstream/internal/adapters/driver/cli"
-	"marketstream/internal/adapters/driver/web"
-	"marketstream/internal/adapters/driver/web/handlers"
-	"marketstream/internal/config"
-	"marketstream/internal/core/service"
-	"marketstream/internal/utils"
 )
 
 func main() {
@@ -33,9 +32,12 @@ func main() {
 	logger, logFile := utils.Logger()
 	defer logFile.Close()
 
-	go exchange.ListenExchange("exchange1:40101")
-	go exchange.ListenExchange("exchange2:40102")
-	go exchange.ListenExchange("exchange3:40103")
+	FanInChannel := make(chan exchange.ExchangeData, 100)
+	go exchange.Aggregator(FanInChannel, ctx)
+	// Distributors
+	go exchange.ListenExchange("exchange1:40101", ctx, rdb)
+	go exchange.ListenExchange("exchange2:40102", ctx, rdb)
+	go exchange.ListenExchange("exchange3:40103", ctx, rdb)
 
 	baseHandler := handlers.NewBaseHandler(*logger)
 	repositories := repository.New(db)
