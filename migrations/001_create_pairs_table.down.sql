@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS pairs;
+DROP EXTENSION IF EXISTS "uuid-ossp";
