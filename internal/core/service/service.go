@@ -11,7 +11,7 @@ type Service struct {
 	PriceService *PriceService
 }
 
-func New(repo repository.Repository, red *redis.Client) *Service {
+func New(repo *repository.Repository, red *redis.Client) *Service {
 	return &Service{
 		ModeService:  NewModeService(),
 		PriceService: NewPriceService(repo.PriceRepository, red),

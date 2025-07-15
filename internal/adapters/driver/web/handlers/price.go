@@ -9,9 +9,9 @@ type PriceHandler struct {
 	service driverinterfaces.PriceDriverInterface
 }
 
-func NewPriceHandler(baseHandler BaseHandler, service driverinterfaces.PriceDriverInterface) *PriceHandler {
+func NewPriceHandler(baseHandler *BaseHandler, service driverinterfaces.PriceDriverInterface) *PriceHandler {
 	return &PriceHandler{
-		BaseHandler: baseHandler,
+		BaseHandler: *baseHandler,
 		service:     service,
 	}
 }

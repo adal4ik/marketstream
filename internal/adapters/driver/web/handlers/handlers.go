@@ -9,10 +9,10 @@ import (
 )
 
 type BaseHandler struct {
-	logger slog.Logger
+	logger *slog.Logger
 }
 
-func NewBaseHandler(logger slog.Logger) *BaseHandler {
+func NewBaseHandler(logger *slog.Logger) *BaseHandler {
 	return &BaseHandler{
 		logger: logger,
 	}
@@ -39,7 +39,7 @@ type Handlers struct {
 	PriceHandler *PriceHandler
 }
 
-func New(baseHandler BaseHandler, service service.Service) *Handlers {
+func New(baseHandler *BaseHandler, service *service.Service) *Handlers {
 	return &Handlers{
 		HealthCheck:  NewHealthCheckHandler(baseHandler),
 		ModeHandler:  NewModeHandler(baseHandler),

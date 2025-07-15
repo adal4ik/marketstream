@@ -37,13 +37,13 @@ func main() {
 	go exchange.ListenExchange("exchange2:40102")
 	go exchange.ListenExchange("exchange3:40103")
 
-	baseHandler := handlers.NewBaseHandler(*logger)
+	baseHandler := handlers.NewBaseHandler(logger)
 	repositories := repository.New(db)
-	services := service.New(*repositories, rdb)
-	handlers := handlers.New(*baseHandler, *services)
+	services := service.New(repositories, rdb)
+	handlers := handlers.New(baseHandler, services)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
-	mux := web.NewRouter(*handlers)
+	mux := web.NewRouter(handlers)
 	httpServer := &http.Server{
 		Addr:    cli.Port,
 		Handler: mux,

@@ -6,7 +6,7 @@ import (
 	"marketstream/internal/adapters/driver/web/handlers"
 )
 
-func NewRouter(handlers handlers.Handlers) *http.ServeMux {
+func NewRouter(handlers *handlers.Handlers) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// // Market Data API

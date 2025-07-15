@@ -36,7 +36,7 @@ func Load() *Config {
 		},
 		Redis: RedisConfig{
 			Addr:     mustEnv("REDIS_ADDR"),
-			Password: mustEnv("REDIS_PASSWORD"),
+			Password: os.Getenv("REDIS_PASSWORD"),
 			DB:       mustEnvInt("REDIS_DB"),
 		},
 	}
