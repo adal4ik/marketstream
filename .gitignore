@@ -1,2 +1,36 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of go build
+main
+*.a
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*.bak
+
+# Dependency directories
+vendor/
+
+# IDE/editor
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+
+# Docker stuff
+docker-compose.override.yml
+*.tar
+
+# Local env file
 .env
-app.log
