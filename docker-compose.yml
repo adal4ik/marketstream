@@ -14,8 +14,6 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - marketnet
-
-
   redis:
     image: redis:7
     container_name: redis

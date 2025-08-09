@@ -6,15 +6,13 @@ import (
 )
 
 type Service struct {
-	ModeService     *ModeService
-	PriceService    *PriceService
-	ExchangeService *ExchangeService
+	ModeService  *ModeService
+	PriceService *PriceService
 }
 
 func New(repo repository.Repository, red *redis.Ouredis) *Service {
 	return &Service{
-		ModeService:     NewModeService(),
-		PriceService:    NewPriceService(repo.PriceRepository, red),
-		ExchangeService: NewExchangeService(repo.PriceRepository, red),
+		ModeService:  NewModeService(),
+		PriceService: NewPriceService(repo.PriceRepository, red),
 	}
 }
