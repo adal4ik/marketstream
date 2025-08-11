@@ -1,75 +1,69 @@
-version: "3.8"
-
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: db
+  app:
+    build:
+      context: .
+    container_name: marketflow
+    env_file: ./.env
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      exchange1:
+        condition: service_started
+      exchange2:
+        condition: service_started
+      exchange3:
+        condition: service_started
+    command: ["/app/marketflow"]
+
+  postgres:
+    image: postgres:16
+    container_name: marketflow-postgres
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
+      # Маппим переменные образа Postgres на твои DB_*
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
-    # volumes:
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - marketnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7
-    container_name: redis
+    container_name: marketflow-redis
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
-    networks:
-      - marketnet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   exchange1:
-    image: exchange1
+    image: exchange1:latest
     container_name: exchange1
+    pull_policy: never
     ports:
       - "40101:40101"
-    networks:
-      - marketnet
 
   exchange2:
-    image: exchange2
+    image: exchange2:latest
     container_name: exchange2
+    pull_policy: never
     ports:
       - "40102:40102"
-    networks:
-      - marketnet
 
-  exchange3:  
-    image: exchange3
+  exchange3:
+    image: exchange3:latest
     container_name: exchange3
+    pull_policy: never
     ports:
       - "40103:40103"
-    networks:
-      - marketnet
-
-  app:
-    build: .
-    container_name: app
-    ports:
-      - "8080:8080"
-    environment:
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - REDIS_ADDR=${REDIS_ADDR}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_DB=${REDIS_DB}
-    depends_on:
-      - db
-      - redis
-      - exchange1
-      - exchange2
-      - exchange3
-
-    networks:
-      - marketnet
-
-networks:
-  marketnet:
-    driver: bridge

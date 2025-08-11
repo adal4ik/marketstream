@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	driverinterfaces "marketstream/internal/core/interfaces/driver"
+	driverinterfaces "marketstream/internal/core/ports/driver"
 )
 
 type PriceHandler struct {

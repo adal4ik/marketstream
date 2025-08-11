@@ -9,11 +9,14 @@ import (
 type Service struct {
 	ModeService  *ModeService
 	PriceService *PriceService
+	Exchange     *ExchangeService // ← добавили поле
 }
 
-func New(repo *repository.Repository, red *redis.Client) *Service {
+// Добавили pairs, чтобы ExchangeService знал валидные пары
+func New(repo *repository.Repository, red *redis.Client, pairs []string) *Service {
 	return &Service{
-		ModeService:  NewModeService(),
-		PriceService: NewPriceService(repo.PriceRepository, red),
+		ModeService: NewModeService(),
+		// PriceService: NewPriceService(repo, red),
+		Exchange: NewExchangeService(red, pairs), // ← инициализируем
 	}
 }

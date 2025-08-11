@@ -2,23 +2,39 @@ package exchange
 
 import (
 	"bufio"
-	"log"
+	"context"
 	"net"
+	"time"
 )
 
-func ListenExchange(addr string) {
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		line := scanner.Text()
-		log.Println(line)
-	}
-	if err := scanner.Err(); err != nil {
-		log.Println(err)
+func Listen(ctx context.Context, addr string, out chan<- []byte) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+				continue
+			}
+		}
+		sc := bufio.NewScanner(conn)
+		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for sc.Scan() {
+			b := sc.Bytes()
+			cp := make([]byte, len(b))
+			copy(cp, b)
+			select {
+			case <-ctx.Done():
+				_ = conn.Close()
+				return
+			case out <- cp:
+			}
+		}
+		_ = conn.Close()
+		// упадём в начало цикла и переподключимся
 	}
 }

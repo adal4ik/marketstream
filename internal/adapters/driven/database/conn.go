@@ -35,7 +35,7 @@ func ConnectDB(cfg config.DatabaseConfig) *sql.DB {
 			log.Println("Successfully connected to the database!")
 			return db
 		}
-		
+
 		log.Printf("[Attempt %d/%d] Database ping failed: %v", i, maxRetries, err)
 		time.Sleep(retryDelay)
 	}

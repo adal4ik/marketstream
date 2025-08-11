@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -16,55 +17,132 @@ import (
 	"marketstream/internal/adapters/driven/exchange"
 	"marketstream/internal/adapters/driven/redis"
 	"marketstream/internal/adapters/driver/cli"
-	"marketstream/internal/adapters/driver/web"
-	"marketstream/internal/adapters/driver/web/handlers"
+	httpdrv "marketstream/internal/adapters/driver/http"
+	"marketstream/internal/adapters/driver/http/handlers"
 	"marketstream/internal/config"
 	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
 )
 
 func main() {
-	ctx := context.Background()
-	cfg := config.Load()
-	db := database.ConnectDB(cfg.Database)
-	defer db.Close()
-	rdb := redis.NewRedis(ctx, cfg.Redis)
-	defer rdb.Close()
+	// ---- контекст с сигналами ----
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// ---- логгер / конфиг / коннекты ----
 	logger, logFile := utils.Logger()
 	defer logFile.Close()
 
-	go exchange.ListenExchange("exchange1:40101")
-	go exchange.ListenExchange("exchange2:40102")
-	go exchange.ListenExchange("exchange3:40103")
+	cfg := config.Load()
+	logger.Info("config loaded")
 
+	db := database.ConnectDB(cfg.Database)
+	defer db.Close()
+	logger.Info("postgres connected")
+
+	rdb := redis.NewRedis(ctx, cfg.Redis)
+	defer rdb.Close()
+	logger.Info("redis connected")
+	exchanges := []string{
+		"exchange1:40101",
+		"exchange2:40102",
+		"exchange3:40103",
+	}
+	pairs := []string{"BTCUSDT", "DOGEUSDT", "TONUSDT", "SOLUSDT", "ETHUSDT"}
+	// ---- DI ----
+	repos := repository.New(db)
+	services := service.New(repos, rdb, pairs)
 	baseHandler := handlers.NewBaseHandler(logger)
-	repositories := repository.New(db)
-	services := service.New(repositories, rdb)
-	handlers := handlers.New(baseHandler, services)
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
-	defer cancel()
-	mux := web.NewRouter(handlers)
+	httpHandlers := handlers.New(baseHandler, services)
+
+	// ---- HTTP ----
+	mux := httpdrv.NewRouter(httpHandlers)
 	httpServer := &http.Server{
-		Addr:    cli.Port,
-		Handler: mux,
+		Addr:         cli.Port, // можно заменить на порт из cfg
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 	go func() {
-		log.Println("Server is running on port: http://localhost" + cli.Port)
+		log.Println("HTTP server: http://localhost" + cli.Port)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe: %s", err)
+			log.Fatalf("ListenAndServe: %v", err)
 		}
 	}()
 
+	resultCh := make(chan service.Tick, 4096) // общий канал fan-in
 	var wg sync.WaitGroup
+
+	for i, addr := range exchanges {
+		exName := fmt.Sprintf("exchange%d", i+1)
+		rawCh := make(chan []byte, 1024)
+
+		// listener с простым backoff-reconnect
+		wg.Add(1)
+		go func(name, a string, out chan<- []byte) {
+			defer wg.Done()
+			backoffs := []time.Duration{time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second}
+			i := 0
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				// блокирующий вызов — пишет строки в out; возвращается при разрыве
+				exchange.Listen(ctx, a, out)
+
+				// backoff перед повтором коннекта
+				wait := backoffs[i]
+				if i < len(backoffs)-1 {
+					i++
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(wait):
+				}
+				_ = name // для логов, если захочешь
+			}
+		}(exName, addr, rawCh)
+
+		// 5 воркеров на источник (fan-out)
+		for w := 0; w < 5; w++ {
+			wg.Add(1)
+			go func(name string, in <-chan []byte) {
+				defer wg.Done()
+				services.Exchange.Worker(ctx, name, in, resultCh)
+			}(exName, rawCh)
+		}
+	}
+
+	// потребитель fan-in (пока заглушка; сюда потом прикрутим Aggregator)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			log.Fatalf("error shutting down http server: %s\n", err)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case t := <-resultCh:
+				_ = t // здесь можно считать метрики/логировать
+			}
 		}
 	}()
+
+	// ---- graceful shutdown ----
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown error: %v", err)
+	}
+
+	// горутины выйдут по ctx.Done()
 	wg.Wait()
+	log.Println("graceful shutdown complete")
 }
