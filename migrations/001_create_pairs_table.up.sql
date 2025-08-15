@@ -1,17 +1,17 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-
-CREATE TABLE IF NOT EXISTS pairs(
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(50) NOT NULL,
-    exchange VARCHAR(50) NOT NULL,
-    time TIMESTAMP NOT NULL DEFAULT NOW(),
-    average_price DECIMAL(10,2),
-    min_price DECIMAL(10,2),
-    max_price DECIMAL(10,2)
+-- минутные агрегаты
+CREATE TABLE IF NOT EXISTS minute_aggregates (
+    pair_name     TEXT        NOT NULL,
+    exchange      TEXT        NOT NULL,
+    "timestamp"   TIMESTAMPTZ NOT NULL,     -- момент агрегирования (UTC)
+    average_price DOUBLE PRECISION NOT NULL,
+    min_price     DOUBLE PRECISION NOT NULL,
+    max_price     DOUBLE PRECISION NOT NULL,
+    CONSTRAINT uq_minute UNIQUE (pair_name, exchange, "timestamp")  -- защита от дублей
 );
 
-CREATE INDEX IF NOT EXISTS idx_pairs_name ON pairs(name);
-CREATE INDEX IF NOT EXISTS idx_pairs_exchange ON pairs(exchange);
-CREATE INDEX IF NOT EXISTS idx_pairs_time ON pairs(time);
-CREATE INDEX IF NOT EXISTS idx_pairs_name_exchange_time ON pairs(name, exchange, time DESC);
+-- индексы для выборок по времени и паре/бирже
+CREATE INDEX IF NOT EXISTS idx_min_agg_ts
+    ON minute_aggregates ("timestamp");
+
+CREATE INDEX IF NOT EXISTS idx_min_agg_pair_ex_ts
+    ON minute_aggregates (pair_name, exchange, "timestamp" DESC);

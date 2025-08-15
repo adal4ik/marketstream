@@ -9,14 +9,15 @@ import (
 type Service struct {
 	ModeService  *ModeService
 	PriceService *PriceService
-	Exchange     *ExchangeService // ← добавили поле
+	Exchange     *ExchangeService
+	Aggregator   *Aggregator
 }
 
-// Добавили pairs, чтобы ExchangeService знал валидные пары
-func New(repo *repository.Repository, red *redis.Client, pairs []string) *Service {
+func New(repo *repository.Repository, red *redis.Client, pairs []string, exchanges []string) *Service {
 	return &Service{
 		ModeService: NewModeService(),
 		// PriceService: NewPriceService(repo, red),
-		Exchange: NewExchangeService(red, pairs), // ← инициализируем
+		Exchange:   NewExchangeService(red, pairs),
+		Aggregator: NewAggregator(red, repo.Aggregates, pairs, exchanges),
 	}
 }

@@ -1,2 +1,1 @@
-DROP TABLE IF EXISTS pairs;
-DROP EXTENSION IF EXISTS "uuid-ossp";
+DROP TABLE IF EXISTS minute_aggregates;

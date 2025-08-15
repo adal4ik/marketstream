@@ -1,4 +1,4 @@
-package entities
+package domain
 
 type Pairs struct {
 	PairID       string  `json:"pair_id"`

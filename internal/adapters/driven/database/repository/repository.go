@@ -3,11 +3,13 @@ package repository
 import "database/sql"
 
 type Repository struct {
-	PriceRepository *PriceRepository
+	Price      *PriceRepository
+	Aggregates *AggregateRepository
 }
 
 func New(db *sql.DB) *Repository {
 	return &Repository{
-		PriceRepository: NewPriceRepository(db),
+		Price:      NewPriceRepository(db),
+		Aggregates: NewAggregateRepository(db),
 	}
 }

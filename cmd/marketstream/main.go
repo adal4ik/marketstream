@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -43,22 +42,29 @@ func main() {
 	rdb := redis.NewRedis(ctx, cfg.Redis)
 	defer rdb.Close()
 	logger.Info("redis connected")
-	exchanges := []string{
+
+	// ---- источники и пары (жёстко) ----
+	exchangeAddrs := []string{
 		"exchange1:40101",
 		"exchange2:40102",
 		"exchange3:40103",
 	}
+	exchangeNames := []string{"exchange1", "exchange2", "exchange3"} // имена без портов — пригодятся агрегатору
 	pairs := []string{"BTCUSDT", "DOGEUSDT", "TONUSDT", "SOLUSDT", "ETHUSDT"}
-	// ---- DI ----
+
+	// ---- DI (Service-комбайн) ----
+	// ВАЖНО: сигнатура service.New должна быть New(repo, rdb, pairs, exchanges)
+	// если у тебя пока New(repo, rdb, pairs) — добавь 4-й параметр в конструкторе Service.
 	repos := repository.New(db)
-	services := service.New(repos, rdb, pairs)
+	services := service.New(repos, rdb, pairs, exchangeNames)
+
 	baseHandler := handlers.NewBaseHandler(logger)
 	httpHandlers := handlers.New(baseHandler, services)
 
 	// ---- HTTP ----
 	mux := httpdrv.NewRouter(httpHandlers)
 	httpServer := &http.Server{
-		Addr:         cli.Port, // можно заменить на порт из cfg
+		Addr:         cli.Port, // либо cfg-порт
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -71,19 +77,21 @@ func main() {
 		}
 	}()
 
-	resultCh := make(chan service.Tick, 4096) // общий канал fan-in
+	// ---- fan-out / fan-in ----
+	resultCh := make(chan service.Tick, 4096) // общий канал (если пригодится дальше под метрики)
+
 	var wg sync.WaitGroup
 
-	for i, addr := range exchanges {
-		exName := fmt.Sprintf("exchange%d", i+1)
+	for i, addr := range exchangeAddrs {
+		exName := exchangeNames[i]
 		rawCh := make(chan []byte, 1024)
 
-		// listener с простым backoff-reconnect
+		// listener с backoff-reconnect
 		wg.Add(1)
 		go func(name, a string, out chan<- []byte) {
 			defer wg.Done()
-			backoffs := []time.Duration{time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second}
-			i := 0
+			backoffs := []time.Duration{1 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second}
+			attempt := 0
 			for {
 				select {
 				case <-ctx.Done():
@@ -91,24 +99,24 @@ func main() {
 				default:
 				}
 
-				// блокирующий вызов — пишет строки в out; возвращается при разрыве
+				// блокирующий вызов — читает TCP и пишет строки в out; возвращается при разрыве
 				exchange.Listen(ctx, a, out)
 
-				// backoff перед повтором коннекта
-				wait := backoffs[i]
-				if i < len(backoffs)-1 {
-					i++
+				// пауза перед реконнектом
+				wait := backoffs[attempt]
+				if attempt < len(backoffs)-1 {
+					attempt++
 				}
 				select {
 				case <-ctx.Done():
 					return
 				case <-time.After(wait):
 				}
-				_ = name // для логов, если захочешь
+				_ = name // для логирования при желании
 			}
 		}(exName, addr, rawCh)
 
-		// 5 воркеров на источник (fan-out)
+		// 5 воркеров на источник
 		for w := 0; w < 5; w++ {
 			wg.Add(1)
 			go func(name string, in <-chan []byte) {
@@ -118,7 +126,10 @@ func main() {
 		}
 	}
 
-	// потребитель fan-in (пока заглушка; сюда потом прикрутим Aggregator)
+	// ---- Aggregator (каждую секунду собирает окна 60s, раз в минуту пишет батч в Postgres) ----
+	go services.Aggregator.Run(ctx)
+
+	// ---- потребитель fan-in (опционально — счётчики/лог) ----
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -127,7 +138,7 @@ func main() {
 			case <-ctx.Done():
 				return
 			case t := <-resultCh:
-				_ = t // здесь можно считать метрики/логировать
+				_ = t // здесь можно считать метрики, если надо
 			}
 		}
 	}()
@@ -142,7 +153,6 @@ func main() {
 		log.Printf("http shutdown error: %v", err)
 	}
 
-	// горутины выйдут по ctx.Done()
 	wg.Wait()
 	log.Println("graceful shutdown complete")
 }

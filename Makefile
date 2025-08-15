@@ -2,7 +2,7 @@ include .env
 
 MIGRATIONS_DIR=./migrations
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
-DOCKER_MIGRATE=docker run --rm -v $(shell pwd)/$(MIGRATIONS_DIR):/migrations --network marketnet migrate/migrate
+DOCKER_MIGRATE=docker run --rm -v $(shell pwd)/$(MIGRATIONS_DIR):/migrations:Z --network marketnet migrate/migrate
 
 # ---------------------
 # MIGRATIONS
