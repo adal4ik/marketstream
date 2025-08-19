@@ -54,24 +54,24 @@ services:
     image: exchange1:latest
     container_name: exchange1
     pull_policy: never
-    ports:
-      - "40101:40101"
+    # ports:
+    #   - "40101:40101"
     networks: [marketnet]
 
   exchange2:
     image: exchange2:latest
     container_name: exchange2
     pull_policy: never
-    ports:
-      - "40102:40102"
+    # ports:
+    #   - "40102:40102"
     networks: [marketnet]
 
   exchange3:
     image: exchange3:latest
     container_name: exchange3
     pull_policy: never
-    ports:
-      - "40103:40103"
+    # ports:
+    #   - "40103:40103"
     networks: [marketnet]
 
 networks:

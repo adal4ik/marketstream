@@ -34,15 +34,15 @@ func (b *BaseHandler) handleError(w http.ResponseWriter, r *http.Request, code i
 }
 
 type Handlers struct {
-	HealthCheck  *HealthCheckHandler
-	ModeHandler  *ModeHandler
-	PriceHandler *PriceHandler
+	HealthCheck *HealthCheckHandler
+	ModeHandler *ModeHandler
+	Price       *PriceHandlers
 }
 
-func New(baseHandler *BaseHandler, service *service.Service) *Handlers {
+func New(baseHandler *BaseHandler, svc *service.Service) *Handlers {
 	return &Handlers{
-		HealthCheck:  NewHealthCheckHandler(baseHandler),
-		ModeHandler:  NewModeHandler(baseHandler),
-		PriceHandler: NewPriceHandler(baseHandler, service.PriceService),
+		HealthCheck: NewHealthCheckHandler(baseHandler),
+		ModeHandler: NewModeHandler(baseHandler),
+		Price:       NewPriceHandlers(baseHandler, svc.PriceService),
 	}
 }

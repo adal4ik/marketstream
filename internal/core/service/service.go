@@ -15,9 +15,9 @@ type Service struct {
 
 func New(repo *repository.Repository, red *redis.Client, pairs []string, exchanges []string) *Service {
 	return &Service{
-		ModeService: NewModeService(),
-		// PriceService: NewPriceService(repo, red),
-		Exchange:   NewExchangeService(red, pairs),
-		Aggregator: NewAggregator(red, repo.Aggregates, pairs, exchanges),
+		ModeService:  NewModeService(),
+		PriceService: NewPriceService(red, exchanges), // <-- сюда список бирж
+		Exchange:     NewExchangeService(red, pairs),
+		Aggregator:   NewAggregator(red, repo.Aggregates, pairs, exchanges),
 	}
 }
