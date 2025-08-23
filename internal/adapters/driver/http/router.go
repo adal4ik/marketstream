@@ -21,5 +21,11 @@ func NewRouter(hs *handlers.Handlers) *http.ServeMux {
 	mux.HandleFunc("GET /prices/average/{symbol}", hs.Price.Average)
 	mux.HandleFunc("GET /prices/average/{exchange}/{symbol}", hs.Price.Average)
 
+	mux.HandleFunc("GET /mode", hs.Mode.Get)
+	mux.HandleFunc("POST /mode/live", hs.Mode.Live)
+	mux.HandleFunc("POST /mode/test", hs.Mode.Test)
+
+	mux.HandleFunc("GET /health", hs.HealthCheck.HealthCheck)
+
 	return mux
 }

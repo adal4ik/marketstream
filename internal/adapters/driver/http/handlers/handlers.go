@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"database/sql"
 	"log/slog"
 	"net/http"
 
 	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type BaseHandler struct {
@@ -35,14 +38,14 @@ func (b *BaseHandler) handleError(w http.ResponseWriter, r *http.Request, code i
 
 type Handlers struct {
 	HealthCheck *HealthCheckHandler
-	ModeHandler *ModeHandler
+	Mode        *ModeHandler
 	Price       *PriceHandlers
 }
 
-func New(baseHandler *BaseHandler, svc *service.Service) *Handlers {
+func New(base *BaseHandler, svc *service.Service, db *sql.DB, rdb *redis.Client) *Handlers {
 	return &Handlers{
-		HealthCheck: NewHealthCheckHandler(baseHandler),
-		ModeHandler: NewModeHandler(baseHandler),
-		Price:       NewPriceHandlers(baseHandler, svc.PriceService),
+		HealthCheck: NewHealthCheckHandler(base, svc.HelthCheck),
+		Mode:        NewModeHandler(base, svc.ModeService),
+		Price:       NewPriceHandlers(base, svc.PriceService),
 	}
 }
