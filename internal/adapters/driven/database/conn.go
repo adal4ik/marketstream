@@ -1,9 +1,9 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -11,35 +11,50 @@ import (
 	"marketstream/internal/config"
 )
 
-func ConnectDB(cfg config.DatabaseConfig) *sql.DB {
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
-		"password=%s dbname=%s sslmode=disable",
+func ConnectDB(ctx context.Context, cfg config.DatabaseConfig) (*sql.DB, error) {
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name)
+
+	const (
+		maxRetries = 10
+		retryDelay = 2 * time.Second
+		pingTTL    = 5 * time.Second
+	)
 
 	var db *sql.DB
 	var err error
 
-	maxRetries := 10
-	retryDelay := 2 * time.Second
-
 	for i := 1; i <= maxRetries; i++ {
-		db, err = sql.Open("pgx", psqlInfo)
+		// открываем соединение
+		db, err = sql.Open("pgx", dsn)
 		if err != nil {
-			log.Printf("[Attempt %d/%d] Failed to open DB: %v", i, maxRetries, err)
-			time.Sleep(retryDelay)
-			continue
+			// ждём и пробуем снова
+			select {
+			case <-time.After(retryDelay):
+				continue
+			case <-ctx.Done():
+				return nil, fmt.Errorf("db open canceled: %w", ctx.Err())
+			}
 		}
 
-		err = db.Ping()
+		// пингуем с таймаутом
+		pctx, cancel := context.WithTimeout(ctx, pingTTL)
+		err = db.PingContext(pctx)
+		cancel()
 		if err == nil {
-			log.Println("Successfully connected to the database!")
-			return db
+			return db, nil // успех
 		}
 
-		log.Printf("[Attempt %d/%d] Database ping failed: %v", i, maxRetries, err)
-		time.Sleep(retryDelay)
+		_ = db.Close() // закрываем неудачное соединение
+
+		// ретрай или отмена по контексту
+		select {
+		case <-time.After(retryDelay):
+			continue
+		case <-ctx.Done():
+			return nil, fmt.Errorf("db ping canceled: %w", ctx.Err())
+		}
 	}
 
-	log.Fatalf("Database unreachable after %d attempts: %v", maxRetries, err)
-	return nil
+	return nil, fmt.Errorf("database unreachable after %d attempts: %w", maxRetries, err)
 }

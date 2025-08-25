@@ -1,7 +1,9 @@
 package domain
 
-type Symbol string
-type Exchange string
+type (
+	Symbol   string
+	Exchange string
+)
 
 // Тик от биржи
 type Tick struct {

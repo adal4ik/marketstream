@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	"marketstream/internal/core/service"
 	"net/http"
+
+	"marketstream/internal/core/service"
 )
 
 type HealthCheckHandler struct {

@@ -1,24 +1,46 @@
-package redis
+package redisx
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"time"
 
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 
 	"marketstream/internal/config"
 )
 
-func NewRedis(ctx context.Context, cfg config.RedisConfig) *redis.Client {
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
-		Password: cfg.Password, // no password set
-		DB:       cfg.DB,       // use default DB
-	})
-	pong, err := client.Ping(ctx).Result()
-	if err != nil {
-		panic(err)
+func NewRedis(ctx context.Context, cfg config.RedisConfig) (*goredis.Client, error) {
+	const (
+		maxRetries = 5
+		retryDelay = 1 * time.Second
+		pingTTL    = 2 * time.Second
+	)
+
+	var lastErr error
+	for i := 1; i <= maxRetries; i++ {
+		rdb := goredis.NewClient(&goredis.Options{
+			Addr:     cfg.Addr,
+			Password: cfg.Password,
+			DB:       cfg.DB,
+		})
+
+		pctx, cancel := context.WithTimeout(ctx, pingTTL)
+		err := rdb.Ping(pctx).Err()
+		cancel()
+
+		if err == nil {
+			return rdb, nil
+		}
+		_ = rdb.Close()
+		lastErr = err
+
+		select {
+		case <-time.After(retryDelay):
+		case <-ctx.Done():
+			return nil, fmt.Errorf("redis connect canceled: %w", ctx.Err())
+		}
 	}
-	log.Println("Redis connection established:", pong)
-	return client
+
+	return nil, fmt.Errorf("redis unreachable after %d attempts: %w", maxRetries, lastErr)
 }

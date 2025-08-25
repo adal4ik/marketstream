@@ -13,7 +13,7 @@ import (
 
 	"marketstream/internal/adapters/driven/database"
 	"marketstream/internal/adapters/driven/database/repository"
-	"marketstream/internal/adapters/driven/redis"
+	redisx "marketstream/internal/adapters/driven/redis"
 	"marketstream/internal/adapters/driver/cli"
 	httpdrv "marketstream/internal/adapters/driver/http"
 	"marketstream/internal/adapters/driver/http/handlers"
@@ -34,12 +34,24 @@ func main() {
 	cfg := config.Load()
 	logger.Info("config loaded")
 
-	db := database.ConnectDB(cfg.Database)
+	db, err := database.ConnectDB(ctx, cfg.Database)
+	if err != nil {
+		logger.Error("db connect failed", "err", err)
+		os.Exit(1)
+	}
 	defer db.Close()
 	logger.Info("postgres connected")
 
-	rdb := redis.NewRedis(ctx, cfg.Redis)
-	defer rdb.Close()
+	rdb, err := redisx.NewRedis(ctx, cfg.Redis)
+	if err != nil {
+		logger.Warn("redis connect failed", "err", err)
+		rdb = nil
+	}
+	defer func() {
+		if rdb != nil {
+			_ = rdb.Close()
+		}
+	}()
 	logger.Info("redis connected")
 
 	// ---- источники/пары ----
@@ -51,14 +63,12 @@ func main() {
 	exchangeNames := []string{"exchange1", "exchange2", "exchange3"}
 	pairs := []string{"BTCUSDT", "DOGEUSDT", "TONUSDT", "SOLUSDT", "ETHUSDT"}
 
-	// fan-in (если нужно считать метрики — можно подписаться)
+	// fan-in
 	resultCh := make(chan service.Tick, 4096)
 
 	// ---- DI ----
 	repos := repository.New(db)
 	mode := service.ParseMode(os.Getenv("MODE")) // "live" (default) | "test"
-
-	// New(repo, rdb, pairs, exchanges, resultCh, initialMode)
 	svcs := service.New(repos, rdb, pairs, exchangeNames, resultCh, mode, db)
 
 	// ---- старт начального режима ----
@@ -66,7 +76,7 @@ func main() {
 		svcs.ModeService.SwitchToLive(ctx, exchangeAddrs)
 		logger.Info("mode live started")
 	} else {
-		svcs.ModeService.SwitchToTest(ctx, 3, 5) // 3 тест-«биржи», 5 tps/пара
+		svcs.ModeService.SwitchToTest(ctx, 3, 5)
 		logger.Info("mode test started")
 	}
 
