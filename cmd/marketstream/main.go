@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,7 +29,13 @@ func main() {
 
 	// ---- логгер / конфиг / коннекты ----
 	logger, logFile := utils.Logger()
-	defer logFile.Close()
+	if logger == nil {
+		// Fallback на стандартный вывод, чтобы не паниковать
+		logger = slog.Default()
+	}
+	if logFile != nil {
+		defer logFile.Close()
+	}
 
 	cfg := config.Load()
 	logger.Info("config loaded")
@@ -46,13 +52,14 @@ func main() {
 	if err != nil {
 		logger.Warn("redis connect failed", "err", err)
 		rdb = nil
+	} else {
+		logger.Info("redis connected")
 	}
 	defer func() {
 		if rdb != nil {
 			_ = rdb.Close()
 		}
 	}()
-	logger.Info("redis connected")
 
 	// ---- источники/пары ----
 	exchangeAddrs := []string{
@@ -80,16 +87,18 @@ func main() {
 		logger.Info("mode test started")
 	}
 
-	// ---- агрегатор ----
+	// ---- агрегатор + consumer фан-ина ----
 	go svcs.Aggregator.Run(ctx)
+	collector := service.NewCollector(logger)
+	go collector.Run(ctx, resultCh)
 
 	// ---- HTTP ----
 	baseHandler := handlers.NewBaseHandler(logger)
-	httpHandlers := handlers.New(baseHandler, svcs, db, rdb) // у тебя уже так
+	httpHandlers := handlers.New(baseHandler, svcs, db, rdb)
 	mux := httpdrv.NewRouter(httpHandlers)
 
 	httpServer := &http.Server{
-		Addr:         cli.Port, // или порт из cfg
+		Addr:         cli.Port, // или из cfg
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -97,9 +106,10 @@ func main() {
 	}
 
 	go func() {
-		log.Println("HTTP server: http://localhost" + cli.Port)
+		logger.Info("http server started", "addr", cli.Port)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe: %v", err)
+			logger.Error("http server error", "err", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -108,14 +118,13 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// аккуратно гасим источники (live/test)
+	// аккуратно гасим источники
 	if svcs.Sources != nil {
 		svcs.Sources.StopAll()
 	}
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("http shutdown error: %v", err)
+		logger.Error("http shutdown error", "err", err)
 	}
-
-	log.Println("graceful shutdown complete")
+	logger.Info("graceful shutdown complete")
 }

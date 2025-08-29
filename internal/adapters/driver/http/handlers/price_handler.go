@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 
 	"marketstream/internal/core/service"
+	"marketstream/internal/utils"
 )
 
 type PriceHandlers struct {
@@ -25,7 +27,11 @@ func (h *PriceHandlers) Latest(w http.ResponseWriter, r *http.Request) {
 		h.Base.handleError(w, r, http.StatusBadRequest, "symbol is required", nil)
 		return
 	}
-	price, ok, err := h.Svc.Latest(r.Context(), symbol)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 300*time.Millisecond)
+	defer cancel()
+
+	price, ok, err := h.Svc.Latest(ctx, symbol)
 	if err != nil {
 		h.Base.handleError(w, r, http.StatusInternalServerError, "redis error", err)
 		return
@@ -35,7 +41,7 @@ func (h *PriceHandlers) Latest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"symbol": upper(symbol),
+		"symbol": utils.UpperASCII(symbol),
 		"price":  price,
 	})
 }
@@ -48,7 +54,11 @@ func (h *PriceHandlers) LatestByExchange(w http.ResponseWriter, r *http.Request)
 		h.Base.handleError(w, r, http.StatusBadRequest, "exchange and symbol are required", nil)
 		return
 	}
-	price, ok, err := h.Svc.LatestByExchange(r.Context(), ex, symbol)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 300*time.Millisecond)
+	defer cancel()
+
+	price, ok, err := h.Svc.LatestByExchange(ctx, ex, symbol)
 	if err != nil {
 		h.Base.handleError(w, r, http.StatusInternalServerError, "redis error", err)
 		return
@@ -58,8 +68,8 @@ func (h *PriceHandlers) LatestByExchange(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"exchange": upper(ex),
-		"symbol":   upper(symbol),
+		"exchange": utils.UpperASCII(ex),
+		"symbol":   utils.UpperASCII(symbol),
 		"price":    price,
 	})
 }
@@ -87,7 +97,6 @@ func (h *PriceHandlers) handleStat(w http.ResponseWriter, r *http.Request, kind 
 	if ex != "" {
 		ex = strings.ToLower(ex)
 	}
-
 	symbol := r.PathValue("symbol")
 	if symbol == "" {
 		h.Base.handleError(w, r, http.StatusBadRequest, "symbol is required", nil)
@@ -103,7 +112,10 @@ func (h *PriceHandlers) handleStat(w http.ResponseWriter, r *http.Request, kind 
 		return
 	}
 
-	min, max, avg, ok, statErr := h.Svc.Stats(r.Context(), ex, symbol, period)
+	ctx, cancel := context.WithTimeout(r.Context(), 400*time.Millisecond)
+	defer cancel()
+
+	min, max, avg, ok, statErr := h.Svc.Stats(ctx, ex, symbol, period)
 	if statErr != nil {
 		h.Base.handleError(w, r, http.StatusInternalServerError, "redis error", statErr)
 		return
@@ -114,11 +126,11 @@ func (h *PriceHandlers) handleStat(w http.ResponseWriter, r *http.Request, kind 
 	}
 
 	resp := map[string]any{
-		"symbol": upper(symbol),
+		"symbol": utils.UpperASCII(symbol),
 		"period": period.String(),
 	}
 	if ex != "" {
-		resp["exchange"] = ex
+		resp["exchange"] = utils.UpperASCII(ex)
 	}
 	switch kind {
 	case "highest":
@@ -135,14 +147,4 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
-}
-
-func upper(s string) string {
-	b := []byte(s)
-	for i := range b {
-		if b[i] >= 'a' && b[i] <= 'z' {
-			b[i] -= 'a' - 'A'
-		}
-	}
-	return string(b)
 }
