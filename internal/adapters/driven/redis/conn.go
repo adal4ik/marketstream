@@ -3,11 +3,10 @@ package redisx
 import (
 	"context"
 	"fmt"
+	"marketstream/internal/config"
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
-
-	"marketstream/internal/config"
 )
 
 func NewRedis(ctx context.Context, cfg config.RedisConfig) (*goredis.Client, error) {
@@ -19,7 +18,7 @@ func NewRedis(ctx context.Context, cfg config.RedisConfig) (*goredis.Client, err
 
 	var lastErr error
 	for i := 1; i <= maxRetries; i++ {
-		rdb := goredis.NewClient(&goredis.Options{	
+		rdb := goredis.NewClient(&goredis.Options{
 			Addr:     cfg.Addr,
 			Password: cfg.Password,
 			DB:       cfg.DB,

@@ -3,11 +3,10 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"strconv"
-	"strings"
-
 	"marketstream/internal/core/domain"
 	"marketstream/internal/mapper"
+	"strconv"
+	"strings"
 )
 
 type AggregateRepository struct {

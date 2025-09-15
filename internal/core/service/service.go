@@ -2,7 +2,6 @@ package service
 
 import (
 	"database/sql"
-
 	"marketstream/internal/adapters/driven/database/repository"
 
 	"github.com/redis/go-redis/v9"

@@ -3,12 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"marketstream/internal/core/service"
+	"marketstream/internal/utils"
 	"net/http"
 	"strings"
 	"time"
-
-	"marketstream/internal/core/service"
-	"marketstream/internal/utils"
 )
 
 type PriceHandlers struct {

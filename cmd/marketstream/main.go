@@ -3,6 +3,13 @@ package main
 import (
 	"context"
 	"log/slog"
+	"marketstream/internal/adapters/driven/database"
+	"marketstream/internal/adapters/driven/database/repository"
+	"marketstream/internal/adapters/driver/cli"
+	"marketstream/internal/adapters/driver/http/handlers"
+	"marketstream/internal/config"
+	"marketstream/internal/core/service"
+	"marketstream/internal/utils"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,15 +18,9 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"marketstream/internal/adapters/driven/database"
-	"marketstream/internal/adapters/driven/database/repository"
 	redisx "marketstream/internal/adapters/driven/redis"
-	"marketstream/internal/adapters/driver/cli"
+
 	httpdrv "marketstream/internal/adapters/driver/http"
-	"marketstream/internal/adapters/driver/http/handlers"
-	"marketstream/internal/config"
-	"marketstream/internal/core/service"
-	"marketstream/internal/utils"
 )
 
 func main() {

@@ -1,10 +1,9 @@
 package handlers
 
 import (
+	"marketstream/internal/core/service"
 	"net/http"
 	"strconv"
-
-	"marketstream/internal/core/service"
 )
 
 type ModeHandler struct {

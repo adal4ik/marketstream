@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"marketstream/internal/config"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-
-	"marketstream/internal/config"
 )
 
 func ConnectDB(ctx context.Context, cfg config.DatabaseConfig) (*sql.DB, error) {

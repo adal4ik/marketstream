@@ -3,10 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"marketstream/internal/core/service"
 	"net/http"
 	"time"
-
-	"marketstream/internal/core/service"
 )
 
 type HealthCheckHandler struct {
