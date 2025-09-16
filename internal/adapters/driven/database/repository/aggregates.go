@@ -3,48 +3,63 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"marketstream/internal/core/domain"
-	"marketstream/internal/mapper"
-	"strconv"
-	"strings"
+	"time"
 )
+
+type MinuteAggregateRecord struct {
+	PairName     string
+	Exchange     string
+	Timestamp    time.Time
+	AveragePrice float64
+	MinPrice     float64
+	MaxPrice     float64
+}
 
 type AggregateRepository struct {
 	db *sql.DB
 }
 
-func NewAggregateRepository(db *sql.DB) *AggregateRepository {
-	return &AggregateRepository{
-		db: db,
-	}
-}
-
-func (r *AggregateRepository) BatchInsert(ctx context.Context, recs []domain.MinuteAggregate) error {
+// BatchInsert: upsert минутных агрегатов.
+// Если запись уже есть за ту же минуту — обновляем avg, min, max.
+func (r *AggregateRepository) BatchInsert(ctx context.Context, recs []MinuteAggregateRecord) error {
 	if len(recs) == 0 {
 		return nil
 	}
-	var sb strings.Builder
-	args := make([]any, 0, len(recs)*6)
 
-	sb.WriteString(`INSERT INTO minute_aggregates (pair_name, exchange, "timestamp", average_price, min_price, max_price) VALUES `)
-
-	for i, d := range recs {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		base := i*6 + 1
-		sb.WriteString("(" +
-			"$" + strconv.Itoa(base+0) + "," +
-			"$" + strconv.Itoa(base+1) + "," +
-			"$" + strconv.Itoa(base+2) + "," +
-			"$" + strconv.Itoa(base+3) + "," +
-			"$" + strconv.Itoa(base+4) + "," +
-			"$" + strconv.Itoa(base+5) + ")")
-
-		row := mapper.ToRow(d)
-		args = append(args, row.PairName, row.Exchange, row.Timestamp, row.AveragePrice, row.MinPrice, row.MaxPrice)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
 	}
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO minute_aggregates
+			(pair_name, exchange, "timestamp", average_price, min_price, max_price)
+		VALUES
+			($1,$2,$3,$4,$5,$6)
+		ON CONFLICT (pair_name, exchange, "timestamp")
+		DO UPDATE SET
+			average_price = EXCLUDED.average_price,
+			min_price     = LEAST(minute_aggregates.min_price, EXCLUDED.min_price),
+			max_price     = GREATEST(minute_aggregates.max_price, EXCLUDED.max_price)
+	`)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
 
-	_, err := r.db.ExecContext(ctx, sb.String(), args...)
-	return err
+	for _, rec := range recs {
+		if _, err := stmt.ExecContext(
+			ctx,
+			rec.PairName,
+			rec.Exchange,
+			rec.Timestamp, // TIMESTAMPTZ
+			rec.AveragePrice,
+			rec.MinPrice,
+			rec.MaxPrice,
+		); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
 }

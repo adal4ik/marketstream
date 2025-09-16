@@ -2,31 +2,44 @@ package service
 
 import (
 	"database/sql"
+	"log/slog"
+
 	"marketstream/internal/adapters/driven/database/repository"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type Service struct {
+	HelthCheck   *HealthCheckService
 	ModeService  *ModeService
 	PriceService *PriceService
-	Exchange     *ExchangeService
 	Aggregator   *Aggregator
-	Sources      *SourceManager
-	HelthCheck   *HealthCheckService
 }
 
-func New(repo *repository.Repository, rdb *redis.Client, pairs []string, exchanges []string, resultCh chan Tick, initialMode Mode, db *sql.DB) *Service {
+// exchanges: список live-бирж по именам (например: []string{"exchange1","exchange2","exchange3"})
+// liveAddrs: адреса tcp для live (например: []string{"exchange1:40101","exchange2:40102","exchange3:40103"})
+func New(
+	logger *slog.Logger,
+	repo *repository.Repository,
+	rdb *redis.Client,
+	pairs []string,
+	liveAddrs []string,
+	resultCh chan Tick,
+	initialMode Mode,
+	db *sql.DB,
+) *Service {
+	priceSvc := NewPriceService(rdb, []string{"exchange1", "exchange2", "exchange3"})
 	exSvc := NewExchangeService(rdb, pairs)
 	srcMgr := NewSourceManager(exSvc, pairs, resultCh)
-	modeSvc := NewModeService(srcMgr, initialMode)
+	modeSvc := NewModeService(logger, srcMgr, priceSvc, initialMode)
+	health := NewHealthCheckService(db, rdb)
+
+	agg := NewAggregator(rdb, repo.Aggregate, pairs, priceSvc)
 
 	return &Service{
+		HelthCheck:   health,
 		ModeService:  modeSvc,
-		PriceService: NewPriceService(rdb, exchanges),
-		Exchange:     exSvc,
-		Aggregator:   NewAggregator(rdb, repo.Aggregates, pairs, exchanges),
-		Sources:      srcMgr,
-		HelthCheck:   NewHealthCheckService(db, rdb),
+		PriceService: priceSvc,
+		Aggregator:   agg, // ← добавили в возвращаемую структуру
 	}
 }

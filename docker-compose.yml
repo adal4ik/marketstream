@@ -24,7 +24,6 @@ services:
     image: postgres:16
     container_name: marketflow-postgres
     environment:
-      # Маппим переменные образа Postgres на твои DB_*
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
@@ -35,7 +34,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:z  # ← файл из корня
     networks: [marketnet]
+
 
   redis:
     image: redis:7
@@ -77,3 +80,6 @@ services:
 networks:
   marketnet:
     name: marketnet
+
+volumes:
+  pgdata:

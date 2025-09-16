@@ -7,72 +7,53 @@ import (
 	"time"
 )
 
-type GenTick struct {
+// фиксированная цена для тестового режима
+const generatorPrice = 100.00
+
+type Generator struct {
+	Name  string   // например "testex1"
+	Pairs []string // список пар
+	Hz    int      // тиков/сек
+}
+
+type genTick struct {
+	Exchange  string  `json:"exchange"`
 	Symbol    string  `json:"symbol"`
 	Price     float64 `json:"price"`
-	Timestamp int64   `json:"timestamp"`
+	Timestamp int64   `json:"timestamp"` // важно: timestamp (мс), а не time
 }
 
-// Generator пишет в out такой же JSON, как настоящие источники.
-type Generator struct {
-	Name  string
-	Pairs []string
-	Hz    int // тиков в секунду на пару (минимум 1)
-}
-
+// Run генерит одинаковую цену и пишет JSON в out (chan []byte).
 func (g *Generator) Run(ctx context.Context, out chan<- []byte) {
-	if g.Hz <= 0 {
-		g.Hz = 5
+	hz := g.Hz
+	if hz <= 0 {
+		hz = 5
 	}
-	// сглаженный рандом-бродячий процесс
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	base := map[string]float64{
-		"BTCUSDT":  100000,
-		"ETHUSDT":  3000,
-		"SOLUSDT":  200,
-		"DOGEUSDT": 0.3,
-		"TONUSDT":  3.5,
-	}
-	step := map[string]float64{
-		"BTCUSDT":  200,
-		"ETHUSDT":  30,
-		"SOLUSDT":  4,
-		"DOGEUSDT": 0.01,
-		"TONUSDT":  0.05,
-	}
-	// инициализация
-	state := make(map[string]float64, len(g.Pairs))
-	for _, p := range g.Pairs {
-		if v, ok := base[p]; ok {
-			state[p] = v
-		} else {
-			state[p] = 100 // дефолт
-		}
-	}
+	period := time.Second / time.Duration(hz)
+	t := time.NewTicker(period)
+	defer t.Stop()
 
-	interval := time.Second / time.Duration(g.Hz)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond) // небольшой джиттер старта
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case t := <-ticker.C:
-			ts := t.UTC().UnixMilli()
+		case now := <-t.C:
+			ts := now.UTC().UnixMilli()
 			for _, p := range g.Pairs {
-				d := step[p]
-				if d == 0 {
-					d = 1
+				msg := genTick{
+					Exchange:  g.Name,
+					Symbol:    p,
+					Price:     generatorPrice,
+					Timestamp: ts, // сразу миллисекунды
 				}
-				// случайный дрейф
-				state[p] += (r.Float64()*2 - 1) * d
-				if state[p] < 0 {
-					state[p] = d
-				}
-				msg := GenTick{Symbol: p, Price: state[p], Timestamp: ts}
 				b, _ := json.Marshal(msg)
-				out <- b
+				select {
+				case out <- b:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}

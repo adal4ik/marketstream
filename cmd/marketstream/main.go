@@ -6,6 +6,7 @@ import (
 	"marketstream/internal/adapters/driven/database"
 	"marketstream/internal/adapters/driven/database/repository"
 	"marketstream/internal/adapters/driver/cli"
+	httpdrv "marketstream/internal/adapters/driver/http"
 	"marketstream/internal/adapters/driver/http/handlers"
 	"marketstream/internal/config"
 	"marketstream/internal/core/service"
@@ -19,8 +20,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	redisx "marketstream/internal/adapters/driven/redis"
-
-	httpdrv "marketstream/internal/adapters/driver/http"
 )
 
 func main() {
@@ -31,7 +30,6 @@ func main() {
 	// ---- логгер / конфиг / коннекты ----
 	logger, logFile := utils.Logger()
 	if logger == nil {
-		// Fallback на стандартный вывод, чтобы не паниковать
 		logger = slog.Default()
 	}
 	if logFile != nil {
@@ -63,43 +61,63 @@ func main() {
 	}()
 
 	// ---- источники/пары ----
-	exchangeAddrs := []string{
+	liveAddrs := []string{
 		"exchange1:40101",
 		"exchange2:40102",
 		"exchange3:40103",
 	}
-	exchangeNames := []string{"exchange1", "exchange2", "exchange3"}
 	pairs := []string{"BTCUSDT", "DOGEUSDT", "TONUSDT", "SOLUSDT", "ETHUSDT"}
 
-	// fan-in
+	// fan-in канал (общий для всех источников)
 	resultCh := make(chan service.Tick, 4096)
 
 	// ---- DI ----
 	repos := repository.New(db)
 	mode := service.ParseMode(os.Getenv("MODE")) // "live" (default) | "test"
-	svcs := service.New(repos, rdb, pairs, exchangeNames, resultCh, mode, db)
+
+	svcs := service.New(
+		logger,
+		repos,
+		rdb,
+		pairs,
+		liveAddrs,
+		resultCh,
+		mode,
+		db,
+	)
 
 	// ---- старт начального режима ----
 	if mode == service.ModeLive {
-		svcs.ModeService.SwitchToLive(ctx, exchangeAddrs)
+		svcs.ModeService.SwitchToLive(ctx, liveAddrs)
 		logger.Info("mode live started")
 	} else {
-		svcs.ModeService.SwitchToTest(ctx, 3, 5)
+		// num=3 генераторов, hz=5 тиков/сек; пары те же
+		svcs.ModeService.SwitchToTest(ctx, 3, 5, pairs)
 		logger.Info("mode test started")
 	}
-
-	// ---- агрегатор + consumer фан-ина ----
 	go svcs.Aggregator.Run(ctx)
-	collector := service.NewCollector(logger)
-	go collector.Run(ctx, resultCh)
+
+	// ---- постоянный дренаж fan-in ----
+	// Всегда держим потребителя, чтобы тикеры не забивали буфер и не вешали отправителей.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-resultCh:
+				// no-op: просто дренаж; тут можно считать метрики
+			}
+		}
+	}()
 
 	// ---- HTTP ----
 	baseHandler := handlers.NewBaseHandler(logger)
-	httpHandlers := handlers.New(baseHandler, svcs, db, rdb)
+	// обновлённая сигнатура: добавлены pairs и liveAddrs
+	httpHandlers := handlers.New(baseHandler, svcs, db, rdb, pairs, liveAddrs)
 	mux := httpdrv.NewRouter(httpHandlers)
 
 	httpServer := &http.Server{
-		Addr:         cli.Port, // или из cfg
+		Addr:         cli.Port, // можно заменить на cfg.App.Port
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -119,10 +137,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// аккуратно гасим источники
-	if svcs.Sources != nil {
-		svcs.Sources.StopAll()
-	}
+	// аккуратно гасим источники (если поле доступно)
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http shutdown error", "err", err)

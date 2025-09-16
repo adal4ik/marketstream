@@ -96,6 +96,20 @@ func (s *PriceService) Stats(ctx context.Context, exchange, symbol string, perio
 	return min, max, avg, true, nil
 }
 
+func (s *PriceService) SetExchanges(list []string) {
+	norm := make([]string, 0, len(list))
+	for _, e := range list {
+		norm = append(norm, strings.ToLower(e))
+	}
+	s.exchanges = norm
+}
+
+func (s *PriceService) Exchanges() []string {
+	cp := make([]string, len(s.exchanges))
+	copy(cp, s.exchanges)
+	return cp
+}
+
 func (s *PriceService) statsOne(ctx context.Context, exchange, symbol string, fromMs, toMs int64) (min, max, sum float64, count int, ok bool, err error) {
 	key := "ticks:" + strings.ToLower(exchange) + ":" + utils.UpperASCII(symbol)
 	res, e := s.rdb.ZRangeByScoreWithScores(ctx, key, &redis.ZRangeBy{

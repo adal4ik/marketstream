@@ -1,36 +1,36 @@
 package handlers
 
 import (
-	"marketstream/internal/core/service"
 	"net/http"
 	"strconv"
+
+	"marketstream/internal/core/service"
 )
 
 type ModeHandler struct {
-	Base *BaseHandler
-	Svc  *service.ModeService
+	BaseHandler
+	Svc       *service.ModeService
+	Pairs     []string
+	LiveAddrs []string
 }
 
-func NewModeHandler(base *BaseHandler, svc *service.ModeService) *ModeHandler {
-	return &ModeHandler{Base: base, Svc: svc}
+func NewModeHandler(base *BaseHandler, svc *service.ModeService, pairs []string, liveAddrs []string) *ModeHandler {
+	return &ModeHandler{BaseHandler: *base, Svc: svc, Pairs: pairs, LiveAddrs: liveAddrs}
 }
 
-// GET /mode
-func (h *ModeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"mode": h.Svc.Current(),
-	})
-}
-
-// POST /mode/live
 func (h *ModeHandler) Live(w http.ResponseWriter, r *http.Request) {
-	// exchanges берутся из main (пробрасываются в ModeService.SwitchToLive)
-	// здесь просто переключаем
-	h.Svc.SwitchToLive(r.Context(), nil) // список уйдёт из main через замыкание или setter (см. ниже)
-	writeJSON(w, http.StatusOK, map[string]any{"mode": "live"})
+	// запрет: если уже live с теми же адресами — вернуть 409
+	if h.Svc.IsLiveWith(h.LiveAddrs) {
+		h.handleError(w, r, http.StatusConflict, "already in live mode with the same configuration", nil)
+		return
+	}
+
+	h.Svc.SwitchToLive(r.Context(), h.LiveAddrs)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok","mode":"live"}`))
 }
 
-// POST /mode/test?num=3&hz=5
 func (h *ModeHandler) Test(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	num, _ := strconv.Atoi(q.Get("num"))
@@ -41,8 +41,15 @@ func (h *ModeHandler) Test(w http.ResponseWriter, r *http.Request) {
 	if hz <= 0 {
 		hz = 5
 	}
-	h.Svc.SwitchToTest(r.Context(), num, hz)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"mode": "test", "num": num, "hz": hz,
-	})
+
+	// запрет: если уже test с теми же параметрами — вернуть 409
+	if h.Svc.IsTestWith(num, hz) {
+		h.handleError(w, r, http.StatusConflict, "already in test mode with the same configuration", nil)
+		return
+	}
+
+	h.Svc.SwitchToTest(r.Context(), num, hz, h.Pairs)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok","mode":"test"}`))
 }

@@ -52,8 +52,8 @@ func (s *ExchangeService) Worker(ctx context.Context, exName string, in <-chan [
 			if !s.isAllowed(t.Symbol) {
 				continue
 			}
-			if t.Timestamp == 0 {
-				t.Timestamp = time.Now().UnixMilli()
+			if t.Timestamp < 1_000_000_000_000 { // если пришло в секундах
+				t.Timestamp *= 1000
 			}
 
 			// --- Redis: latest 60s ---

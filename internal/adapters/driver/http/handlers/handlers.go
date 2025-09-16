@@ -41,10 +41,10 @@ type Handlers struct {
 	Price       *PriceHandlers
 }
 
-func New(base *BaseHandler, svc *service.Service, db *sql.DB, rdb *redis.Client) *Handlers {
+func New(base *BaseHandler, svc *service.Service, db *sql.DB, rdb *redis.Client, pairs []string, liveAddrs []string) *Handlers {
 	return &Handlers{
 		HealthCheck: NewHealthCheckHandler(base, svc.HelthCheck),
-		Mode:        NewModeHandler(base, svc.ModeService),
+		Mode:        NewModeHandler(base, svc.ModeService, pairs, liveAddrs),
 		Price:       NewPriceHandlers(base, svc.PriceService),
 	}
 }

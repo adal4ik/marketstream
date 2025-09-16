@@ -113,11 +113,13 @@ func (m *SourceManager) StartTest(ctx context.Context, numEx int, hz int) {
 		tctx, cancel := context.WithCancel(ctx)
 		m.testStops = append(m.testStops, cancel)
 
+		// напоминание контекста (менять не нужно)
 		gen := &exchange.Generator{
 			Name:  exName,
 			Pairs: m.pairs,
 			Hz:    hz,
 		}
+		go gen.Run(ctx, rawCh) // Run(ctx, out chan<- []byte)
 
 		// generator
 		m.wg.Add(1)
