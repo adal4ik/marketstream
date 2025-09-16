@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -8,14 +9,15 @@ import (
 )
 
 type ModeHandler struct {
+	appctx context.Context
 	BaseHandler
 	Svc       *service.ModeService
 	Pairs     []string
 	LiveAddrs []string
 }
 
-func NewModeHandler(base *BaseHandler, svc *service.ModeService, pairs []string, liveAddrs []string) *ModeHandler {
-	return &ModeHandler{BaseHandler: *base, Svc: svc, Pairs: pairs, LiveAddrs: liveAddrs}
+func NewModeHandler(base *BaseHandler, svc *service.ModeService, pairs []string, liveAddrs []string, appctx context.Context) *ModeHandler {
+	return &ModeHandler{BaseHandler: *base, Svc: svc, Pairs: pairs, LiveAddrs: liveAddrs, appctx: appctx}
 }
 
 func (h *ModeHandler) Live(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +27,7 @@ func (h *ModeHandler) Live(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Svc.SwitchToLive(r.Context(), h.LiveAddrs)
+	h.Svc.SwitchToLive(h.appctx, h.LiveAddrs)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok","mode":"live"}`))
@@ -48,7 +50,7 @@ func (h *ModeHandler) Test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Svc.SwitchToTest(r.Context(), num, hz, h.Pairs)
+	h.Svc.SwitchToTest(h.appctx, num, hz, h.Pairs)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok","mode":"test"}`))

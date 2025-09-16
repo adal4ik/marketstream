@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"marketstream/internal/core/service"
@@ -41,10 +42,10 @@ type Handlers struct {
 	Price       *PriceHandlers
 }
 
-func New(base *BaseHandler, svc *service.Service, db *sql.DB, rdb *redis.Client, pairs []string, liveAddrs []string) *Handlers {
+func New(base *BaseHandler, svc *service.Service, db *sql.DB, rdb *redis.Client, pairs []string, liveAddrs []string, ctx context.Context) *Handlers {
 	return &Handlers{
 		HealthCheck: NewHealthCheckHandler(base, svc.HelthCheck),
-		Mode:        NewModeHandler(base, svc.ModeService, pairs, liveAddrs),
+		Mode:        NewModeHandler(base, svc.ModeService, pairs, liveAddrs, ctx),
 		Price:       NewPriceHandlers(base, svc.PriceService),
 	}
 }

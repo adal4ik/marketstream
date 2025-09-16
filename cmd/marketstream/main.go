@@ -113,7 +113,7 @@ func main() {
 	// ---- HTTP ----
 	baseHandler := handlers.NewBaseHandler(logger)
 	// обновлённая сигнатура: добавлены pairs и liveAddrs
-	httpHandlers := handlers.New(baseHandler, svcs, db, rdb, pairs, liveAddrs)
+	httpHandlers := handlers.New(baseHandler, svcs, db, rdb, pairs, liveAddrs, ctx)
 	mux := httpdrv.NewRouter(httpHandlers)
 
 	httpServer := &http.Server{
