@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"marketstream/internal/utils"
 	"strconv"
 	"strings"
 	"time"
+
+	"marketstream/internal/utils"
 
 	"github.com/redis/go-redis/v9"
 )

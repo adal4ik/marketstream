@@ -3,8 +3,9 @@ package redisx
 import (
 	"context"
 	"fmt"
-	"marketstream/internal/config"
 	"time"
+
+	"marketstream/internal/config"
 
 	goredis "github.com/redis/go-redis/v9"
 )

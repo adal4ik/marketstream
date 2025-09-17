@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"net/http"
+
 	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
-	"net/http"
 
 	"github.com/redis/go-redis/v9"
 )

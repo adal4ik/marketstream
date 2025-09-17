@@ -1,8 +1,9 @@
 package http
 
 import (
-	"marketstream/internal/adapters/driver/http/handlers"
 	"net/http"
+
+	"marketstream/internal/adapters/driver/http/handlers"
 )
 
 func NewRouter(hs *handlers.Handlers) *http.ServeMux {

@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"marketstream/internal/adapters/driven/exchange"
 	"strings"
 	"sync"
 	"time"
+
+	"marketstream/internal/adapters/driven/exchange"
 )
 
 type SourceManager struct {

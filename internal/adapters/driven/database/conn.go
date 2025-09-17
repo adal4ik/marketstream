@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"marketstream/internal/config"
 	"time"
+
+	"marketstream/internal/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

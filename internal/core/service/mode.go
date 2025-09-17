@@ -56,6 +56,7 @@ func (m *ModeService) currentMode() Mode {
 	defer m.modeMu.RUnlock()
 	return m.mode
 }
+
 func (m *ModeService) setMode(md Mode) {
 	m.modeMu.Lock()
 	m.mode = md

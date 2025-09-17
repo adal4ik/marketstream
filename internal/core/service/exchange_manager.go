@@ -3,8 +3,9 @@ package service
 
 import (
 	"context"
-	"marketstream/internal/adapters/driven/exchange"
 	"sync"
+
+	"marketstream/internal/adapters/driven/exchange"
 )
 
 type Manager struct {

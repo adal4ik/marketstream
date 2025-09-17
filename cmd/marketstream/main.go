@@ -3,6 +3,12 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"marketstream/internal/adapters/driven/database"
 	"marketstream/internal/adapters/driven/database/repository"
 	"marketstream/internal/adapters/driver/cli"
@@ -11,11 +17,6 @@ import (
 	"marketstream/internal/config"
 	"marketstream/internal/core/service"
 	"marketstream/internal/utils"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
